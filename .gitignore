@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+*.db
+iaod.db
+uploads/*
+!uploads/.gitkeep
+reports/*
+!reports/.gitkeep
+*.pdf
