@@ -67,7 +67,7 @@ def verify_invoice_calculations(invoice_dict):
     # 3. Verify Tax (FR-6.1)
     tax_rate = float(invoice_dict.get('tax_rate', 0.0))
     billed_tax = float(invoice_dict.get('tax_amount', 0.0))
-    taxable_base = max(0.0, expected_subtotal)
+    taxable_base = max(0.0, expected_subtotal - billed_discount)
 
     if tax_rate > 0:
         expected_tax = round(taxable_base * (tax_rate / 100.0), 2)
