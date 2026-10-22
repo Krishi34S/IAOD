@@ -130,3 +130,112 @@ class DuplicateItemRule(BaseDetectionRule):
                 seen[key] = idx
         return anomalies
 
+
+class PriceAnomalyRule(BaseDetectionRule):
+    """FR-5.3 & FR-5.4: Compares item unit price against reference catalog and historical purchases."""
+    
+    def evaluate(self, invoice_data, calc_results, context):
+        anomalies = []
+        ref_finder = context.get('ref_finder')
+        hist_finder = context.get('hist_finder')
+
+        for item in invoice_data.get('items', []):
+            desc = item['description']
+            unit_p = float(item['unit_price'])
+            category = item.get('category')
+
+            # 1. Compare against Reference Price Catalog
+            ref_match = ref_finder(desc, category) if ref_finder else None
+            if ref_match:
+                expected_p = float(ref_match['expected_unit_price'])
+                tolerance_pct = float(ref_match['tolerance_percent'])
+                max_allowed_p = expected_p * (1.0 + tolerance_pct / 100.0)
+
+                if unit_p > max_allowed_p:
+                    variance_pct = ((unit_p - expected_p) / expected_p) * 100.0
+                    unit_diff = round(unit_p - expected_p, 2)
+                    total_excess = round(unit_diff * float(item['quantity']), 2)
+
+                    if variance_pct >= 50.0:
+                        severity = 'CRITICAL'
+                    elif variance_pct >= 25.0:
+                        severity = 'HIGH'
+                    else:
+                        severity = 'MEDIUM'
+
+                    anomalies.append({
+                        'anomaly_type': 'PRICE_ANOMALY',
+                        'severity': severity,
+                        'item_id': item.get('item_id'),
+                        'affected_value': unit_p,
+                        'expected_value': expected_p,
+                        'difference': total_excess,
+                        'explanation': (
+                            f"Unusually high price for '{desc}': Billed unit price {unit_p:,.2f} is "
+                            f"{variance_pct:.1f}% above the benchmark reference price of {expected_p:,.2f} "
+                            f"(tolerance threshold: {tolerance_pct}%). Total excess impact on line item: {total_excess:,.2f}."
+                        )
+                    })
+                    continue  # already flagged via benchmark
+
+            # 2. Compare against Historical Purchase Prices (if no catalog match or catalog passed)
+            if hist_finder:
+                history = hist_finder(desc, exclude_invoice_id=invoice_data.get('invoice_id'))
+                if history and len(history) >= 1:
+                    avg_hist_price = sum(h['unit_price'] for h in history) / len(history)
+                    if avg_hist_price > 0 and unit_p > avg_hist_price * 1.25: # >25% higher than historical avg
+                        variance_pct = ((unit_p - avg_hist_price) / avg_hist_price) * 100.0
+                        total_excess = round((unit_p - avg_hist_price) * float(item['quantity']), 2)
+                        anomalies.append({
+                            'anomaly_type': 'PRICE_ANOMALY',
+                            'severity': 'HIGH' if variance_pct >= 50 else 'MEDIUM',
+                            'item_id': item.get('item_id'),
+                            'affected_value': unit_p,
+                            'expected_value': round(avg_hist_price, 2),
+                            'difference': total_excess,
+                            'explanation': (
+                                f"Historical price deviation for '{desc}': Unit price {unit_p:,.2f} is "
+                                f"{variance_pct:.1f}% higher than historical purchase average ({avg_hist_price:,.2f} "
+                                f"across {len(history)} past purchase(s)). Excess impact: {total_excess:,.2f}."
+                            )
+                        })
+
+        return anomalies
+
+
+class TaxAndDiscountRule(BaseDetectionRule):
+    """FR-6: Verifies tax calculations and discount bounds."""
+    
+    def evaluate(self, invoice_data, calc_results, context):
+        anomalies = []
+
+        # Tax discrepancy check (FR-6.3)
+        tax_diff = calc_results['tax_discrepancy']
+        if abs(tax_diff) > 0.05 and calc_results['tax_rate'] > 0:
+            anomalies.append({
+                'anomaly_type': 'TAX_MISMATCH',
+                'severity': 'HIGH' if tax_diff > 100 else 'MEDIUM',
+                'item_id': None,
+                'affected_value': calc_results['billed_tax'],
+                'expected_value': calc_results['expected_tax'],
+                'difference': tax_diff,
+                'explanation': (
+                    f"Tax calculation mismatch: Billed tax amount {calc_results['billed_tax']:,.2f} "
+                    f"does not match expected tax {calc_results['expected_tax']:,.2f} computed at {calc_results['tax_rate']}% "
+                    f"on taxable base (diff: {tax_diff:+,.2f})."
+                )
+            })
+
+        # Discount error check (FR-6.2)
+        if calc_results.get('discount_error'):
+            anomalies.append({
+                'anomaly_type': 'DISCOUNT_MISMATCH',
+                'severity': 'HIGH',
+                'item_id': None,
+                'affected_value': calc_results['billed_discount'],
+                'expected_value': 0.0,
+                'difference': calc_results['billed_discount'],
+                'explanation': calc_results['discount_error']
+            })
+
+        return anomalies
