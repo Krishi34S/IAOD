@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Sign In - IAOD{% endblock %}
+
+{% block content %}
+<div style="max-width: 460px; margin: 3rem auto;">
+  <div class="card" style="padding: 2rem;">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--slate-900);">Sign In to IAOD</h1>
+      <p style="font-size: 0.85rem; color: var(--slate-500); margin-top: 0.25rem;">
+        Automated Invoice Audit, Overbilling & Anomaly Detection
+      </p>
+    </div>
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+      <div class="form-group">
+        <label class="form-label" for="email">Work Email</label>
+        <input type="email" id="email" name="email" class="form-control" placeholder="name@organization.com" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+        Sign In
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--slate-600);">
+      Don't have an account? <a href="{{ url_for('auth.register') }}" style="color: var(--primary); font-weight: 600;">Register here</a>
+    </div>
+
+    <!-- Quick Role Switcher for Evaluators and Testers -->
+    <div style="margin-top: 2rem; padding-top: 1.25rem; border-top: 1px dashed var(--slate-200);">
+      <div style="font-size: 0.75rem; font-weight: 700; color: var(--slate-500); text-transform: uppercase; margin-bottom: 0.75rem; text-align: center;">
+        Quick Demo Sign-in by Role
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="fillCreds('admin@iaod.local', 'Admin@123')">
+          👑 Admin
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="fillCreds('finance@iaod.local', 'Finance@123')">
+          💼 Finance Staff
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="fillCreds('management@iaod.local', 'Manage@123')">
+          📊 Management
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="fillCreds('user@iaod.local', 'User@123')">
+          🏢 Org User
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fillCreds(email, pwd) {
+  document.getElementById('email').value = email;
+  document.getElementById('password').value = pwd;
+}
+</script>
+{% endblock %}

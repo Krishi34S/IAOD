@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Create Account - IAOD{% endblock %}
+
+{% block content %}
+<div style="max-width: 480px; margin: 3rem auto;">
+  <div class="card" style="padding: 2rem;">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--slate-900);">Create an Account</h1>
+      <p style="font-size: 0.85rem; color: var(--slate-500); margin-top: 0.25rem;">
+        Register to submit and audit organization invoices
+      </p>
+    </div>
+
+    <form method="POST" action="{{ url_for('auth.register') }}">
+      <div class="form-group">
+        <label class="form-label" for="name">Full Name</label>
+        <input type="text" id="name" name="name" class="form-control" placeholder="e.g. Krishi Pratim Sarma" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Work Email</label>
+        <input type="email" id="email" name="email" class="form-control" placeholder="user@tezu.ac.in" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="role">User Role</label>
+        <select id="role" name="role" class="form-control">
+          <option value="user">Organisation User (Submit & View)</option>
+          <option value="finance_staff">Finance Staff (Review & Audit)</option>
+          <option value="management">Management (Dashboard & Reports)</option>
+          <option value="admin">Administrator (System & Config)</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+        Complete Registration
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--slate-600);">
+      Already have an account? <a href="{{ url_for('auth.login') }}" style="color: var(--primary); font-weight: 600;">Sign in here</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

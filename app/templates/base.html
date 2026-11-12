@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}IAOD - Invoice Anomaly & Overbilling Detector{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="navbar">
+    <div style="display: flex; align-items: center; gap: 2rem;">
+      <a href="{{ url_for('dashboard_views.index') }}" class="nav-brand">
+        <span>IAOD</span>
+        <span class="nav-brand-badge">Audit Engine</span>
+      </a>
+      {% if user %}
+      <nav class="nav-links">
+        <a href="{{ url_for('dashboard_views.index') }}" class="nav-link {% if request.path == '/' or request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('dashboard_views.invoices_list') }}" class="nav-link {% if request.path.startswith('/invoices') and request.path != '/invoices/new' %}active{% endif %}">Audits & History</a>
+        <a href="{{ url_for('dashboard_views.new_invoice') }}" class="nav-link {% if request.path == '/invoices/new' %}active{% endif %}">+ New Audit</a>
+        <a href="{{ url_for('dashboard_views.reference_prices') }}" class="nav-link {% if request.path.startswith('/reference-prices') %}active{% endif %}">Price Catalog</a>
+        {% if user.role == 'admin' %}
+        <a href="{{ url_for('dashboard_views.admin_users') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">User Management</a>
+        {% endif %}
+      </nav>
+      {% endif %}
+    </div>
+
+    <div>
+      {% if user %}
+      <div class="nav-user">
+        <span style="font-size: 0.85rem; font-weight: 500;">{{ user.name }}</span>
+        <span class="role-badge {{ user.role }}">{{ user.role.replace('_', ' ') }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-secondary" style="margin-left: 0.5rem;">Logout</a>
+      </div>
+      {% else %}
+      <div style="display: flex; gap: 0.75rem;">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-secondary">Login</a>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-primary">Register</a>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="container" style="padding-bottom: 0;">
+        {% for category, msg in messages %}
+          <div class="alert-banner {% if category == 'error' %}danger{% else %}success{% endif %}">
+            <span>{{ msg }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Main Body Content -->
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- System Footer -->
+  <footer class="footer">
+    <div>
+      <strong>Invoice Anomaly & Overbilling Detector (IAOD)</strong> &bull; CSMC502 Software Engineering Lab &bull; Tezpur University
+    </div>
+    <div style="margin-top: 0.25rem;">
+      Supervised by Prof. Dhruba K. Bhattacharyya & Prof. Swarup Roy | Team: Krishi Pratim Sarma, Abhisekh Panjiyar, Kishor Kashyap
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
