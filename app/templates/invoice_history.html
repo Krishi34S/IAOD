@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Invoice History & Search - IAOD{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Invoice Audit History</h1>
+    <p class="page-subtitle">Search, filter, and review historical invoice records and anomaly findings</p>
+  </div>
+  <div>
+    <a href="{{ url_for('dashboard_views.new_invoice') }}" class="btn btn-primary">
+      + Audit New Invoice
+    </a>
+  </div>
+</div>
+
+<!-- Search & Filter Bar (FR-8.2) -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <form method="GET" action="{{ url_for('dashboard_views.invoices_list') }}" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+    <div style="flex: 2; min-width: 240px;">
+      <label class="form-label" for="q">Search Invoice # or Vendor</label>
+      <input type="text" id="q" name="q" class="form-control" placeholder="Search by number or vendor name..." value="{{ q }}">
+    </div>
+
+    <div style="flex: 1; min-width: 160px;">
+      <label class="form-label" for="status">Status</label>
+      <select id="status" name="status" class="form-control">
+        <option value="">All Statuses</option>
+        <option value="NORMAL" {% if current_status == 'NORMAL' %}selected{% endif %}>NORMAL (Clean)</option>
+        <option value="SUSPICIOUS" {% if current_status == 'SUSPICIOUS' %}selected{% endif %}>SUSPICIOUS (Flagged)</option>
+      </select>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit" class="btn btn-primary">
+        Filter
+      </button>
+      <a href="{{ url_for('dashboard_views.invoices_list') }}" class="btn btn-secondary">
+        Reset
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Invoice History Table (FR-8.1, FR-8.2) -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Invoice #</th>
+          <th>Vendor</th>
+          <th>Date</th>
+          <th style="text-align: right;">Billed Total</th>
+          <th style="text-align: right;">Expected</th>
+          <th style="text-align: right;">Discrepancy</th>
+          <th style="text-align: center;">Status</th>
+          <th style="text-align: center;">Anomalies</th>
+          <th>Submitter</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if not invoices %}
+        <tr>
+          <td colspan="10" style="text-align: center; color: var(--slate-500); padding: 2.5rem;">
+            No matching invoice records found.
+          </td>
+        </tr>
+        {% else %}
+          {% for inv in invoices %}
+          <tr>
+            <td style="font-weight: 600;">
+              <a href="{{ url_for('dashboard_views.invoice_detail', invoice_id=inv.invoice_id) }}" style="color: var(--primary); text-decoration: none;">
+                {{ inv.invoice_number }}
+              </a>
+            </td>
+            <td>{{ inv.vendor }}</td>
+            <td>{{ inv.invoice_date }}</td>
+            <td style="text-align: right; font-weight: 600;">₹{{ "{:,.2f}".format(inv.billed_total) }}</td>
+            <td style="text-align: right; color: var(--slate-600);">₹{{ "{:,.2f}".format(inv.expected_total or inv.billed_total) }}</td>
+            <td style="text-align: right; font-weight: 600; color: {% if inv.total_discrepancy > 0 %}var(--danger){% elif inv.total_discrepancy < 0 %}var(--primary){% else %}var(--success){% endif %};">
+              {% if inv.total_discrepancy > 0 %}+{% endif %}₹{{ "{:,.2f}".format(inv.total_discrepancy) }}
+            </td>
+            <td style="text-align: center;">
+              <span class="badge badge-{{ inv.status.lower() }}">{{ inv.status }}</span>
+            </td>
+            <td style="text-align: center; font-weight: 600;">
+              {% if inv.anomaly_count > 0 %}
+                <span class="badge badge-sev-high">{{ inv.anomaly_count }}</span>
+              {% else %}
+                <span style="color: var(--slate-400);">0</span>
+              {% endif %}
+            </td>
+            <td><span style="font-size: 0.825rem; color: var(--slate-600);">{{ inv.submitter_name }}</span></td>
+            <td style="text-align: right;">
+              <div style="display: inline-flex; gap: 0.35rem;">
+                <a href="{{ url_for('dashboard_views.invoice_detail', invoice_id=inv.invoice_id) }}" class="btn btn-sm btn-secondary" title="View Audit Details">
+                  Review
+                </a>
+                <a href="/api/reports/{{ inv.invoice_id }}/download?format=pdf" class="btn btn-sm btn-primary" title="Download PDF" target="_blank">
+                  PDF
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

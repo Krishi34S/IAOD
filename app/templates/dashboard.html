@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard - IAOD{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Executive Audit Dashboard</h1>
+    <p class="page-subtitle">Real-time overview of invoice anomalies, overbilling detection, and financial risks</p>
+  </div>
+  <div>
+    <a href="{{ url_for('dashboard_views.new_invoice') }}" class="btn btn-primary">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+      Audit New Invoice
+    </a>
+  </div>
+</div>
+
+<!-- 4 Key Performance Indicators (FR-8.3) -->
+<div class="grid-4">
+  <div class="card">
+    <div class="card-title">Total Invoices Audited</div>
+    <div class="kpi-value kpi-primary">{{ stats.total_invoices }}</div>
+    <div class="kpi-sub">Across all connected vendors</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Suspicious / Flagged</div>
+    <div class="kpi-value kpi-danger">{{ stats.suspicious_invoices }}</div>
+    <div class="kpi-sub">{{ "%.1f"|format((stats.suspicious_invoices / stats.total_invoices * 100) if stats.total_invoices > 0 else 0) }}% flag rate requiring review</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Clean / Normal Invoices</div>
+    <div class="kpi-value kpi-success">{{ stats.normal_invoices }}</div>
+    <div class="kpi-sub">100% compliant with price benchmark</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Potential Overbilling Detected</div>
+    <div class="kpi-value kpi-warning">₹{{ "{:,.2f}".format(stats.total_overbilled) }}</div>
+    <div class="kpi-sub">Preventable procurement loss identified</div>
+  </div>
+</div>
+
+<!-- Financial Reconciliation Summary & Breakdown Charts (FR-8.4) -->
+<div class="grid-2">
+  <!-- Anomaly Categories Distribution -->
+  <div class="card">
+    <h2 style="font-size: 1.05rem; font-weight: 700; color: var(--slate-900); margin-bottom: 1rem;">
+      Detected Anomaly Distribution
+    </h2>
+    {% if not stats.anomaly_breakdown %}
+      <p style="color: var(--slate-500); font-size: 0.9rem; padding: 1.5rem 0; text-align: center;">
+        No anomalies detected in the system yet.
+      </p>
+    {% else %}
+      <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+        {% set total_anom = stats.anomaly_breakdown|map(attribute='count')|sum %}
+        {% for anom in stats.anomaly_breakdown %}
+          {% set pct = (anom.count / total_anom * 100)|round(1) %}
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.825rem; font-weight: 600; margin-bottom: 0.25rem;">
+              <span>{{ anom.anomaly_type.replace('_', ' ') }}</span>
+              <span>{{ anom.count }} ({{ pct }}%)</span>
+            </div>
+            <div style="background-color: var(--slate-100); height: 8px; border-radius: 4px; overflow: hidden;">
+              <div style="width: {{ pct }}%; height: 100%; background-color: var(--primary); border-radius: 4px;"></div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Severity Breakdown -->
+  <div class="card">
+    <h2 style="font-size: 1.05rem; font-weight: 700; color: var(--slate-900); margin-bottom: 1rem;">
+      Anomalies by Severity Level
+    </h2>
+    {% if not stats.severity_breakdown %}
+      <p style="color: var(--slate-500); font-size: 0.9rem; padding: 1.5rem 0; text-align: center;">
+        No severity data recorded yet.
+      </p>
+    {% else %}
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+        {% for sev in stats.severity_breakdown %}
+          <div style="border: 1px solid var(--slate-200); border-radius: 6px; padding: 1rem; text-align: center;">
+            <span class="badge badge-sev-{{ sev.severity.lower() }}">{{ sev.severity }}</span>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--slate-900); margin-top: 0.5rem;">
+              {{ sev.count }}
+            </div>
+            <div style="font-size: 0.75rem; color: var(--slate-500);">Incidents flagged</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Recent Invoices Table (FR-8.1, FR-8.2) -->
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="font-size: 1.05rem; font-weight: 700; color: var(--slate-900);">
+      Recent Audited Invoices
+    </h2>
+    <a href="{{ url_for('dashboard_views.invoices_list') }}" style="font-size: 0.85rem; color: var(--primary); font-weight: 600; text-decoration: none;">
+      View All Invoices &rarr;
+    </a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Invoice #</th>
+          <th>Vendor</th>
+          <th>Date</th>
+          <th style="text-align: right;">Billed Total</th>
+          <th style="text-align: right;">Expected</th>
+          <th style="text-align: right;">Discrepancy</th>
+          <th style="text-align: center;">Status</th>
+          <th style="text-align: center;">Risk Score</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if not stats.recent_invoices %}
+        <tr>
+          <td colspan="9" style="text-align: center; color: var(--slate-500); padding: 2rem;">
+            No invoices have been audited yet. Click "Audit New Invoice" to start!
+          </td>
+        </tr>
+        {% else %}
+          {% for inv in stats.recent_invoices %}
+          <tr>
+            <td style="font-weight: 600;">
+              <a href="{{ url_for('dashboard_views.invoice_detail', invoice_id=inv.invoice_id) }}" style="color: var(--primary); text-decoration: none;">
+                {{ inv.invoice_number }}
+              </a>
+            </td>
+            <td>{{ inv.vendor }}</td>
+            <td>{{ inv.invoice_date }}</td>
+            <td style="text-align: right; font-weight: 600;">₹{{ "{:,.2f}".format(inv.billed_total) }}</td>
+            <td style="text-align: right; color: var(--slate-600);">₹{{ "{:,.2f}".format(inv.expected_total or inv.billed_total) }}</td>
+            <td style="text-align: right; font-weight: 600; color: {% if inv.total_discrepancy > 0 %}var(--danger){% elif inv.total_discrepancy < 0 %}var(--primary){% else %}var(--success){% endif %};">
+              {% if inv.total_discrepancy > 0 %}+{% endif %}₹{{ "{:,.2f}".format(inv.total_discrepancy) }}
+            </td>
+            <td style="text-align: center;">
+              <span class="badge badge-{{ inv.status.lower() }}">{{ inv.status }}</span>
+            </td>
+            <td style="text-align: center; font-weight: 600;">
+              {{ "%.0f"|format(inv.risk_score or 0) }}/100
+            </td>
+            <td style="text-align: right;">
+              <a href="{{ url_for('dashboard_views.invoice_detail', invoice_id=inv.invoice_id) }}" class="btn btn-sm btn-secondary">
+                Audit Review
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
