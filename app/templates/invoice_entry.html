@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% block title %}Audit New Invoice - IAOD{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Submit Invoice for Audit</h1>
+    <p class="page-subtitle">Upload PDF/CSV/JSON invoice or build line items manually for anomaly detection</p>
+  </div>
+  <div>
+    <a href="{{ url_for('dashboard_views.invoices_list') }}" class="btn btn-secondary">
+      &larr; Back to History
+    </a>
+  </div>
+</div>
+
+<div class="card" style="padding: 1.5rem;">
+  <!-- Navigation Tabs (FR-2.1, FR-2.2) -->
+  <div class="tabs-nav">
+    <button type="button" class="tab-btn active" data-target="tab-upload">
+      📁 Upload Invoice File (PDF, CSV, JSON)
+    </button>
+    <button type="button" class="tab-btn" data-target="tab-manual">
+      ✍️ Manual Invoice Entry & Line Item Builder
+    </button>
+  </div>
+
+  <!-- TAB 1: File Upload (FR-2.1) -->
+  <div id="tab-upload" class="tab-content active">
+    <div id="dropzone" class="dropzone">
+      <div class="dropzone-icon">📄</div>
+      <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--slate-900);">
+        Drag & Drop invoice file here, or click to browse
+      </h3>
+      <p style="font-size: 0.85rem; color: var(--slate-500); margin-top: 0.35rem;">
+        Supports <strong>PDF</strong>, <strong>CSV</strong>, and <strong>JSON</strong> formats up to 16 MB.
+      </p>
+      <input type="file" id="file-input" accept=".pdf,.csv,.json,.txt" style="display: none;">
+      <button type="button" class="btn btn-secondary" style="margin-top: 1rem;" onclick="document.getElementById('file-input').click()">
+        Choose File from Computer
+      </button>
+    </div>
+
+    <div id="upload-status" style="display: none; margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 6px; background-color: var(--slate-100); font-size: 0.875rem;"></div>
+
+    <!-- Quick Demo Invoices Loader -->
+    <div style="margin-top: 2rem; padding: 1.25rem; border: 1px dashed var(--slate-300); border-radius: 8px; background-color: var(--slate-50);">
+      <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; margin-bottom: 0.5rem;">
+        ⚡ Instant Evaluator Demo: Test Real-World Scenarios
+      </h4>
+      <p style="font-size: 0.8rem; color: var(--slate-500); margin-bottom: 0.75rem;">
+        Click any scenario below to automatically load and analyze pre-configured test invoices:
+      </p>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="loadSampleInvoice('normal')">
+          ✅ 1. Compliant Invoice (Clean)
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="loadSampleInvoice('overbilling')">
+          🚨 2. Overbilling & Inflation
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="loadSampleInvoice('price_spike')">
+          📈 3. Price Spike vs Benchmark
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="loadSampleInvoice('calc_error')">
+          🧮 4. Calculation & Tax Mismatch
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Manual Line Item Builder (FR-2.2, FR-2.3) -->
+  <div id="tab-manual" class="tab-content">
+    <form id="manual-invoice-form">
+      <div class="grid-4" style="margin-bottom: 1.25rem;">
+        <div class="form-group">
+          <label class="form-label" for="invoice_number">Invoice Number *</label>
+          <input type="text" id="invoice_number" class="form-control" placeholder="e.g. INV-2026-0042" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="vendor">Vendor / Supplier *</label>
+          <input type="text" id="vendor" class="form-control" placeholder="e.g. Apex Infotech Pvt Ltd" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="invoice_date">Invoice Date *</label>
+          <input type="date" id="invoice_date" class="form-control" value="2026-03-24" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tax_rate">Tax Rate (%)</label>
+          <input type="number" step="0.1" id="tax_rate" class="form-control" value="18.0" oninput="recalculateTotals()">
+        </div>
+      </div>
+
+      <!-- Line Items Table -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--slate-800);">Invoice Line Items (FR-3.1)</h3>
+        <button type="button" id="btn-add-item" class="btn btn-sm btn-secondary">+ Add Line Item</button>
+      </div>
+
+      <div class="table-responsive" style="margin-bottom: 1.5rem;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Description *</th>
+              <th>Category</th>
+              <th style="width: 100px;">Qty *</th>
+              <th style="width: 140px;">Unit Price (₹) *</th>
+              <th style="width: 150px;">Billed Total (₹)</th>
+              <th style="width: 50px; text-align: center;"></th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody">
+            <!-- Default First Row -->
+            <tr class="item-row">
+              <td>
+                <input type="text" class="form-control item-desc" placeholder="e.g. Dell Latitude 5420 Laptop" value="Dell Latitude 5420 Laptop" required list="ref-items-datalist">
+              </td>
+              <td>
+                <input type="text" class="form-control item-cat" placeholder="Category" value="Electronics">
+              </td>
+              <td style="width: 100px;">
+                <input type="number" step="0.01" min="0.01" class="form-control item-qty" value="2" required oninput="recalculateTotals()">
+              </td>
+              <td style="width: 140px;">
+                <input type="number" step="0.01" min="0" class="form-control item-price" value="65000" required oninput="recalculateTotals()">
+              </td>
+              <td style="width: 150px;">
+                <input type="number" step="0.01" min="0" class="form-control item-line-total" value="130000" oninput="recalculateTotals()">
+              </td>
+              <td style="width: 50px; text-align: center;">
+                <button type="button" class="btn btn-sm btn-danger btn-remove-item">&times;</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Totals & Reconciliation Preview -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; background-color: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+        <div>
+          <div class="form-group">
+            <label class="form-label" for="discount_amount">Discount Applied (₹)</label>
+            <input type="number" step="0.01" min="0" id="discount_amount" class="form-control" value="0.00" oninput="recalculateTotals()">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tax_amount">Billed Tax Amount (₹)</label>
+            <input type="number" step="0.01" min="0" id="tax_amount" class="form-control" value="23400.00" oninput="recalculateTotals()">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="billed_total">Final Billed Total Stated on Invoice (₹) *</label>
+            <input type="number" step="0.01" min="0.01" id="billed_total" class="form-control" value="153400.00" required oninput="this.dataset.manualOverride='true'; recalculateTotals()">
+            <small style="color: var(--slate-500); font-size: 0.75rem;">Modify this to test overbilling detection rules.</small>
+          </div>
+        </div>
+
+        <div style="border-left: 1px solid var(--slate-200); padding-left: 1.5rem; display: flex; flex-direction: column; justify-content: center;">
+          <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--slate-500); text-transform: uppercase; margin-bottom: 0.5rem;">
+            Live Calculation Preview
+          </h4>
+          <div style="font-size: 0.85rem; color: var(--slate-700); margin-bottom: 0.25rem;">
+            Expected Subtotal: <strong>₹<span id="preview-expected-subtotal">130,000.00</span></strong>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--slate-700); margin-bottom: 0.25rem;">
+            Calculated Tax: <strong>₹<span id="preview-expected-tax">23,400.00</span></strong>
+          </div>
+          <div style="font-size: 1.1rem; color: var(--slate-900); font-weight: 700; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--slate-300);">
+            Expected Total: ₹<span id="preview-expected-total">153,400.00</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+        <button type="button" class="btn btn-secondary" onclick="window.location.reload()">Reset</button>
+        <button type="submit" class="btn btn-primary">Run Calculation & Anomaly Audit &rarr;</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Datalist for Reference Catalog Items -->
+<datalist id="ref-items-datalist">
+  {% for item in reference_items %}
+  <option value="{{ item.item_name }}">{{ item.category }} (Benchmark: ₹{{ item.expected_unit_price }})</option>
+  {% endfor %}
+</datalist>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadSampleInvoice(type) {
+  const samples = {
+    normal: {
+      invoice_number: "INV-2026-NORMAL",
+      vendor: "Apex Office Solutions",
+      invoice_date: "2026-03-20",
+      tax_rate: 18.0,
+      tax_amount: 2520.00,
+      discount_amount: 0.00,
+      billed_total: 16520.00,
+      items: [
+        { description: "A4 Copier Paper 75GSM (Box of 5)", category: "Stationery", quantity: 5, unit_price: 1400.00, line_total: 7000.00 },
+        { description: "Whiteboard 6x4 ft Magnetic", category: "Stationery", quantity: 2, unit_price: 3200.00, line_total: 6400.00 },
+        { description: "Logitech Wireless Keyboard & Mouse Combo", category: "Electronics", quantity: 1, unit_price: 1800.00, line_total: 1800.00 }
+      ]
+    },
+    overbilling: {
+      invoice_number: "INV-2026-OVERBILLED",
+      vendor: "Skyline Infra Tech",
+      invoice_date: "2026-03-21",
+      tax_rate: 18.0,
+      tax_amount: 27000.00,
+      discount_amount: 0.00,
+      billed_total: 195000.00, // Should be 177,000.00 (Overbilled by 18,000.00)
+      items: [
+        { description: "Dell Latitude 5420 Laptop", category: "Electronics", quantity: 2, unit_price: 65000.00, line_total: 130000.00 },
+        { description: "Samsung 27-inch 4K Monitor", category: "Electronics", quantity: 1, unit_price: 24000.00, line_total: 24000.00 }
+      ]
+    },
+    price_spike: {
+      invoice_number: "INV-2026-PRICE-SPIKE",
+      vendor: "Premier Hardware Corp",
+      invoice_date: "2026-03-22",
+      tax_rate: 18.0,
+      tax_amount: 14760.00,
+      discount_amount: 0.00,
+      billed_total: 96760.00,
+      items: [
+        { description: "Cisco 24-Port Gigabit Switch", category: "Networking", quantity: 2, unit_price: 41000.00, line_total: 82000.00 } // Benchmark is 28,000 (+46.4% spike)
+      ]
+    },
+    calc_error: {
+      invoice_number: "INV-2026-MATH-ERROR",
+      vendor: "Delta Stationery Ltd",
+      invoice_date: "2026-03-23",
+      tax_rate: 18.0,
+      tax_amount: 5000.00, // Mismatched tax
+      discount_amount: 0.00,
+      billed_total: 35000.00,
+      items: [
+        { description: "Ergonomic Office Chair", category: "Furniture", quantity: 3, unit_price: 8500.00, line_total: 30000.00 } // 3 * 8500 = 25500, but billed as 30000
+      ]
+    }
+  };
+
+  const sample = samples[type];
+  if (!sample) return;
+
+  // Switch to Manual tab
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-target="tab-manual"]').classList.add('active');
+  document.getElementById('tab-manual').classList.add('active');
+
+  // Fill Header fields
+  document.getElementById('invoice_number').value = sample.invoice_number;
+  document.getElementById('vendor').value = sample.vendor;
+  document.getElementById('invoice_date').value = sample.invoice_date;
+  document.getElementById('tax_rate').value = sample.tax_rate;
+  document.getElementById('tax_amount').value = sample.tax_amount.toFixed(2);
+  document.getElementById('discount_amount').value = sample.discount_amount.toFixed(2);
+  document.getElementById('billed_total').value = sample.billed_total.toFixed(2);
+  document.getElementById('billed_total').dataset.manualOverride = 'true';
+
+  // Fill Items
+  const tbody = document.getElementById('items-tbody');
+  tbody.innerHTML = '';
+  sample.items.forEach(it => {
+    addManualItemRow(it.description, it.category, it.quantity, it.unit_price, it.line_total);
+  });
+
+  recalculateTotals();
+  showToast(`Sample '${type}' loaded. Ready for audit!`, 'info');
+}
+</script>
+{% endblock %}
