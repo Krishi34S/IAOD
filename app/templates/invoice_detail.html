@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}Invoice #{{ invoice.invoice_number }} Audit - IAOD{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <h1 class="page-title">Invoice #{{ invoice.invoice_number }}</h1>
+      <span class="badge badge-{{ invoice.status.lower() }}">{{ invoice.status }}</span>
+      <span class="badge badge-sev-{{ 'critical' if invoice.risk_score >= 50 else ('high' if invoice.risk_score >= 25 else ('medium' if invoice.risk_score > 0 else 'low')) }}">
+        Risk Score: {{ "%.0f"|format(invoice.risk_score or 0) }}/100
+      </span>
+    </div>
+    <p class="page-subtitle">Submitted by {{ invoice.submitter_name }} &bull; Vendor: <strong>{{ invoice.vendor }}</strong> &bull; Date: {{ invoice.invoice_date }}</p>
+  </div>
+
+  <!-- Export & Download Actions (FR-7.5) -->
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    <button type="button" class="btn btn-secondary" onclick="reAnalyze()">
+      🔄 Re-run Audit
+    </button>
+    <a href="/api/reports/{{ invoice.invoice_id }}/download?format=pdf" class="btn btn-primary" target="_blank">
+      📄 Download PDF Report
+    </a>
+    <a href="/api/reports/{{ invoice.invoice_id }}/download?format=json" class="btn btn-secondary" target="_blank">
+      Export JSON
+    </a>
+    <a href="/api/reports/{{ invoice.invoice_id }}/download?format=csv" class="btn btn-secondary" target="_blank">
+      Export CSV
+    </a>
+  </div>
+</div>
+
+<!-- Executive Status Banner (FR-7.3) -->
+<div class="alert-banner {% if invoice.status == 'SUSPICIOUS' %}danger{% else %}success{% endif %}">
+  <div>
+    <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.25rem;">
+      {% if invoice.status == 'SUSPICIOUS' %}
+        ⚠️ Anomalies Detected &mdash; Manual Review Recommended
+      {% else %}
+        ✅ Audit Cleared &mdash; No Anomalies or Overbilling Detected
+      {% endif %}
+    </h3>
+    <p style="font-size: 0.85rem;">
+      {% if invoice.status == 'SUSPICIOUS' %}
+        This invoice was flagged with {{ anomalies|length }} anomaly/anomalies. Predefined detection rules identified discrepancies from expected calculations or catalog reference prices.
+      {% else %}
+        All invoice calculations, line item arithmetic, tax rates, and prices match baseline parameters.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- Financial Reconciliation Overview (FR-3.2, FR-3.3, FR-4.2) -->
+<div class="grid-4">
+  <div class="card">
+    <div class="card-title">Billed Total</div>
+    <div class="kpi-value">₹{{ "{:,.2f}".format(invoice.billed_total) }}</div>
+    <div class="kpi-sub">Stated invoice amount</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Expected Total</div>
+    <div class="kpi-value kpi-primary">₹{{ "{:,.2f}".format(invoice.expected_total or invoice.billed_total) }}</div>
+    <div class="kpi-sub">Verified calculations & tax</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Calculation Discrepancy</div>
+    <div class="kpi-value {% if invoice.total_discrepancy > 0 %}kpi-danger{% elif invoice.total_discrepancy < 0 %}kpi-primary{% else %}kpi-success{% endif %}">
+      {% if invoice.total_discrepancy > 0 %}+{% endif %}₹{{ "{:,.2f}".format(invoice.total_discrepancy) }}
+    </div>
+    <div class="kpi-sub">
+      {% if invoice.total_discrepancy > 0 %}
+        Billed higher than expected
+      {% elif invoice.total_discrepancy < 0 %}
+        Billed lower than expected
+      {% else %}
+        Exact match
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Audited Items</div>
+    <div class="kpi-value">{{ items|length }}</div>
+    <div class="kpi-sub">Line items parsed & verified</div>
+  </div>
+</div>
+
+<!-- Detected Anomalies Section (FR-4.3, FR-7.1, FR-7.2) -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--slate-900);">
+      Audit Findings & Detected Anomalies ({{ anomalies|length }})
+    </h2>
+    <span style="font-size: 0.8rem; color: var(--slate-500);">Predefined Rule-Based Evaluation</span>
+  </div>
+
+  {% if not anomalies %}
+    <div style="padding: 2rem; text-align: center; color: var(--slate-500);">
+      <svg width="32" height="32" fill="#10b981" viewBox="0 0 16 16" style="margin-bottom: 0.5rem;"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+      <div style="font-weight: 600; color: var(--slate-700);">No Anomalies Detected</div>
+      <div style="font-size: 0.85rem; margin-top: 0.25rem;">This invoice conforms to all calculation, pricing, duplicate, and tax rules.</div>
+    </div>
+  {% else %}
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {% for anom in anomalies %}
+      <div style="border: 1px solid var(--slate-200); border-left: 4px solid {% if anom.severity == 'CRITICAL' %}#ef4444{% elif anom.severity == 'HIGH' %}#f97316{% elif anom.severity == 'MEDIUM' %}#f59e0b{% else %}#3b82f6{% endif %}; border-radius: 6px; padding: 1rem; background-color: var(--white);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span class="badge badge-sev-{{ anom.severity.lower() }}">{{ anom.severity }}</span>
+            <span style="font-weight: 700; font-size: 0.95rem; color: var(--slate-900);">
+              {{ anom.anomaly_type.replace('_', ' ') }}
+            </span>
+            {% if anom.item_description %}
+              <span style="font-size: 0.8rem; background-color: var(--slate-100); padding: 0.15rem 0.5rem; border-radius: 4px; color: var(--slate-600);">
+                Item: {{ anom.item_description }}
+              </span>
+            {% endif %}
+          </div>
+          {% if anom.difference is not none %}
+          <div style="font-weight: 700; font-size: 0.95rem; color: {% if anom.difference > 0 %}var(--danger){% else %}var(--slate-800){% endif %};">
+            Discrepancy: {% if anom.difference > 0 %}+{% endif %}₹{{ "{:,.2f}".format(anom.difference) }}
+          </div>
+          {% endif %}
+        </div>
+        <p style="font-size: 0.875rem; color: var(--slate-700); line-height: 1.45;">
+          {{ anom.explanation }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Itemized Line Items Table (FR-3.1) -->
+<div class="card">
+  <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--slate-900); margin-bottom: 1rem;">
+    Itemized Line Items Verification
+  </h2>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th style="text-align: right;">Quantity</th>
+          <th style="text-align: right;">Unit Price</th>
+          <th style="text-align: right;">Billed Line Total</th>
+          <th style="text-align: right;">Expected Line Total</th>
+          <th style="text-align: center;">Arithmetic Check</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        {% set is_diff = (item.line_total - item.expected_line_total)|abs > 0.05 %}
+        <tr style="{% if is_diff %}background-color: #fef2f2;{% endif %}">
+          <td>{{ loop.index }}</td>
+          <td style="font-weight: 600;">{{ item.description }}</td>
+          <td><span style="font-size: 0.8rem; color: var(--slate-500);">{{ item.category or 'General' }}</span></td>
+          <td style="text-align: right;">{{ "%.2f"|format(item.quantity) }}</td>
+          <td style="text-align: right;">₹{{ "{:,.2f}".format(item.unit_price) }}</td>
+          <td style="text-align: right; font-weight: 600;">₹{{ "{:,.2f}".format(item.line_total) }}</td>
+          <td style="text-align: right; color: var(--slate-600);">₹{{ "{:,.2f}".format(item.expected_line_total) }}</td>
+          <td style="text-align: center;">
+            {% if is_diff %}
+              <span class="badge badge-sev-high">Mismatch (₹{{ "{:+,.2f}".format(item.line_total - item.expected_line_total) }})</span>
+            {% else %}
+              <span class="badge badge-normal">Verified</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function reAnalyze() {
+  try {
+    showToast('Re-running calculation and anomaly rules...', 'info');
+    const res = await apiFetch('/api/invoices/{{ invoice.invoice_id }}/analyze', {
+      method: 'POST'
+    });
+    showToast('Analysis updated!', 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+</script>
+{% endblock %}

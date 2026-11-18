@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}Reference Price Catalog - IAOD{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Benchmark Reference Price Catalog</h1>
+    <p class="page-subtitle">Standard baseline purchase prices used by the anomaly engine to flag price spikes (FR-5.3, FR-5.4)</p>
+  </div>
+  {% if user.role in ('admin', 'finance_staff') %}
+  <div>
+    <button type="button" class="btn btn-primary" onclick="toggleAddForm()">
+      + Add Reference Item
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Item Form (Hidden by default) -->
+{% if user.role in ('admin', 'finance_staff') %}
+<div id="add-ref-card" class="card" style="display: none; margin-bottom: 1.5rem; padding: 1.25rem;">
+  <h3 style="font-size: 1rem; font-weight: 700; color: var(--slate-900); margin-bottom: 1rem;">
+    Add New Reference Item
+  </h3>
+  <form id="add-ref-form" onsubmit="event.preventDefault(); submitAddRef();">
+    <div class="grid-4" style="margin-bottom: 1rem;">
+      <div class="form-group">
+        <label class="form-label" for="new_item_name">Item Name *</label>
+        <input type="text" id="new_item_name" class="form-control" placeholder="e.g. Apple MacBook Pro 14" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="new_category">Category *</label>
+        <input type="text" id="new_category" class="form-control" placeholder="Electronics" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="new_price">Benchmark Unit Price (₹) *</label>
+        <input type="number" step="0.01" min="0" id="new_price" class="form-control" placeholder="150000" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="new_tolerance">Tolerance (%)</label>
+        <input type="number" step="0.5" min="0" id="new_tolerance" class="form-control" value="15.0">
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+      <button type="button" class="btn btn-secondary" onclick="toggleAddForm()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save to Catalog</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<!-- Reference Prices Table -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Item Name</th>
+          <th>Category</th>
+          <th style="text-align: right;">Benchmark Unit Price</th>
+          <th style="text-align: center;">Allowed Tolerance</th>
+          <th>Unit</th>
+          <th>Last Updated</th>
+          {% if user.role in ('admin', 'finance_staff') %}
+          <th style="text-align: right;">Actions</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prices %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td style="font-weight: 600;">{{ p.item_name }}</td>
+          <td><span style="font-size: 0.8rem; background-color: var(--slate-100); padding: 0.15rem 0.5rem; border-radius: 4px;">{{ p.category }}</span></td>
+          <td style="text-align: right; font-weight: 600;">₹{{ "{:,.2f}".format(p.expected_unit_price) }}</td>
+          <td style="text-align: center;">&plusmn;{{ p.tolerance_percent }}%</td>
+          <td>{{ p.unit }}</td>
+          <td><span style="font-size: 0.8rem; color: var(--slate-500);">{{ p.updated_at }}</span></td>
+          {% if user.role in ('admin', 'finance_staff') %}
+          <td style="text-align: right;">
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteRef({{ p.reference_id }}, '{{ p.item_name }}')">
+              Delete
+            </button>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAddForm() {
+  const card = document.getElementById('add-ref-card');
+  if (card) {
+    card.style.display = card.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+async function submitAddRef() {
+  const payload = {
+    item_name: document.getElementById('new_item_name').value.trim(),
+    category: document.getElementById('new_category').value.trim(),
+    expected_unit_price: parseFloat(document.getElementById('new_price').value),
+    tolerance_percent: parseFloat(document.getElementById('new_tolerance').value) || 15.0,
+    unit: 'unit'
+  };
+
+  try {
+    await apiFetch('/api/reference-prices', {
+      method: 'POST',
+      body: payload
+    });
+    showToast('Reference item saved successfully!', 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function deleteRef(refId, itemName) {
+  if (!confirm(`Are you sure you want to remove '${itemName}' from benchmark catalog?`)) return;
+
+  try {
+    await apiFetch(`/api/reference-prices/${refId}`, {
+      method: 'DELETE'
+    });
+    showToast('Reference price deleted', 'success');
+    setTimeout(() => window.location.reload(), 600);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+</script>
+{% endblock %}
