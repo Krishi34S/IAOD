@@ -1,0 +1,9 @@
+Invoice Number,INV-CSV-002
+Vendor,Cisco Systems Partner
+Date,2026-03-21
+Tax Rate,18.0
+Discount,0.00
+Billed Total,66080.00
+[Items]
+Description,Category,Quantity,Unit Price,Line Total
+Cisco 24-Port Gigabit Switch,Networking,2,28000.00,56000.00

@@ -1,0 +1,18 @@
+{
+  "invoice_number": "INV-2026-NORMAL-101",
+  "vendor": "Dell Technologies India",
+  "invoice_date": "2026-03-15",
+  "tax_rate": 18.0,
+  "tax_amount": 23400.00,
+  "discount_amount": 0.00,
+  "billed_total": 153400.00,
+  "items": [
+    {
+      "description": "Dell Latitude 5420 Laptop",
+      "category": "Electronics",
+      "quantity": 2,
+      "unit_price": 65000.00,
+      "line_total": 130000.00
+    }
+  ]
+}

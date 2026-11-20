@@ -1,0 +1,18 @@
+{
+  "invoice_number": "INV-2026-OVERBILLED-202",
+  "vendor": "Apex Workspace Supplies",
+  "invoice_date": "2026-03-18",
+  "tax_rate": 18.0,
+  "tax_amount": 5400.00,
+  "discount_amount": 0.00,
+  "billed_total": 42000.00,
+  "items": [
+    {
+      "description": "Ergonomic Office Chair",
+      "category": "Furniture",
+      "quantity": 3,
+      "unit_price": 8500.00,
+      "line_total": 25500.00
+    }
+  ]
+}
