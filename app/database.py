@@ -10,7 +10,7 @@ def get_db():
     """Get the active database connection for the current Flask request context."""
     if 'db' not in g:
         db_path = current_app.config['DATABASE_PATH']
-        g.db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+        g.db = sqlite3.connect(db_path)
         g.db.row_factory = sqlite3.Row
         # Enforce foreign key constraints in SQLite
         g.db.execute("PRAGMA foreign_keys = ON;")

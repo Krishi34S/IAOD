@@ -67,7 +67,7 @@ def api_login():
 @auth_bp.route('/api/auth/logout', methods=['POST', 'GET'])
 def api_logout():
     session.clear()
-    if request.is_json:
+    if request.path.startswith('/api/') or request.is_json:
         return jsonify({'message': 'Logged out successfully'}), 200
     return redirect(url_for('auth.login'))
 

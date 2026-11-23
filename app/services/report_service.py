@@ -19,6 +19,9 @@ class ReportGenerator:
     def generate_pdf_report(invoice, items, anomalies, output_path):
         """Generate a professional PDF audit report using ReportLab."""
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        invoice = dict(invoice)
+        items = [dict(i) for i in items]
+        anomalies = [dict(a) for a in anomalies]
         doc = SimpleDocTemplate(
             output_path,
             pagesize=letter,
