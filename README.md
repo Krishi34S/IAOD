@@ -3,7 +3,7 @@
 > **CSMC502 Software Engineering Lab**  
 > **Department of Computer Science & Engineering, Tezpur University**  
 > **Project No. 22**: Invoice Anomaly & Overbilling Detection  
-> **Supervised by**: Prof. Dhruba K. Bhattacharyya & Prof. Swarup Roy  
+> **Supervised by**: Dr. Dhruba K. Bhattacharyya & Dr. Swarup Roy  
 > **Team Members**:  
 > - Krishi Pratim Sarma (CSM25009)  
 > - Abhisekh Panjiyar (CSM25015)  
